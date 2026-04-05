@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LC-VAE: Latent-Compressed VAE for Video Diffusion Models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f7f4;
+      --surface: #ffffff;
+      --surface2: #f1f0ec;
+      --border: #e5e3dc;
+      --text: #1a1917;
+      --text-muted: #6b6860;
+      --accent: #1a56db;
+      --accent-soft: #dbeafe;
+      --accent2: #7c3aed;
+      --gold: #b45309;
+      --green: #065f46;
+      --tag-bg: #eff6ff;
+      --tag-border: #bfdbfe;
+      --radius: 12px;
+      --shadow: 0 2px 16px rgba(0,0,0,0.07);
+      --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    /* ── TOPBAR ────────────────────────────── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(248,247,244,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar-logo {
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+    .topbar-nav {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+    .topbar-nav a {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .topbar-nav a:hover { color: var(--accent); }
+
+    /* ── HERO ──────────────────────────────── */
+    .hero {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 4rem 2rem 2.5rem;
+      text-align: center;
+    }
+    .conference-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--tag-border);
+      border-radius: 999px;
+      padding: 0.28rem 0.9rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+    .conference-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    h1 {
+      font-family: 'Lora', serif;
+      font-size: clamp(1.9rem, 4vw, 2.7rem);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--accent2);
+    }
+    .shortname {
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 2rem;
+    }
+
+    /* ── AUTHORS ───────────────────────────── */
+    .authors {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem 1.5rem;
+      margin-bottom: 0.6rem;
+    }
+    .author-item {
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .author-item sup { font-size: 0.65em; color: var(--accent); font-weight: 600; margin-left: 1px; }
+    .author-item .star { color: var(--gold); font-size: 0.7em; }
+    .affiliations {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .affiliations sup { font-size: 0.7em; font-weight: 600; color: var(--accent); }
+    .contact-email {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    /* ── LINK BUTTONS ──────────────────────── */
+    .link-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.7rem;
+      margin-bottom: 3rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.18s;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: #1648c4; border-color: #1648c4; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,86,219,0.3); }
+    .btn-outline {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); box-shadow: var(--shadow); }
+    .btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+    /* ── TEASER ────────────────────────────── */
+    .teaser-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      margin: 0 auto 3.5rem;
+      max-width: 860px;
+      box-shadow: var(--shadow);
+    }
+    .teaser-pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      margin-bottom: 1.2rem;
+    }
+    .pipe-block {
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1.1rem;
+      text-align: center;
+      min-width: 110px;
+    }
+    .pipe-block .icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
+    .pipe-block .label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .pipe-block .sublabel { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .pipe-arrow {
+      font-size: 1.3rem;
+      color: var(--border);
+      padding: 0 0.4rem;
+      font-weight: 300;
+    }
+    .pipe-block.highlight {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .pipe-block.highlight .label { color: var(--accent); }
+    .teaser-caption {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+      text-align: left;
+    }
+    .teaser-caption strong { color: var(--text); }
+
+    /* ── SECTION ───────────────────────────── */
+    section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem 3.5rem;
+    }
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+    h2 {
+      font-family: 'Lora', serif;
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.2rem;
+      color: var(--text);
+    }
+    p { color: var(--text); margin-bottom: 1rem; }
+    p:last-child { margin-bottom: 0; }
+
+    /* ── ABSTRACT CARD ─────────────────────── */
+    .abstract-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 1.6rem 1.8rem;
+      box-shadow: var(--shadow);
+      font-size: 0.96rem;
+      line-height: 1.75;
+    }
+
+    /* ── INSIGHT GRID ──────────────────────── */
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .insight-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.3rem;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .insight-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .insight-card .icon { font-size: 1.6rem; margin-bottom: 0.7rem; }
+    .insight-card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .insight-card p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0; }
+
+    /* ── METHOD DIAGRAM ────────────────────── */
+    .method-diagram {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      margin: 1.5rem 0;
+      box-shadow: var(--shadow);
+    }
+    .method-diagram h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .wt-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      margin-bottom: 1.5rem;
+    }
+    .wt-cell {
+      aspect-ratio: 1;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      font-weight: 500;
+      border: 1.5px solid;
+      transition: all 0.2s;
+    }
+    .wt-cell.keep {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+    .wt-cell.zero {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      color: #dc2626;
+      opacity: 0.7;
+    }
+    .wt-legend {
+      display: flex;
+      gap: 1.2rem;
+      font-size: 0.78rem;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+    }
+    .wt-legend-item { display: flex; align-items: center; gap: 0.4rem; color: var(--text-muted); }
+    .wt-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+    .eq-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1.2rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.9;
+      color: var(--text);
+      margin-top: 1rem;
+    }
+    .eq-box .highlight { color: var(--accent); font-weight: 600; }
+    .eq-box .zero-out { color: #dc2626; font-weight: 600; }
+
+    /* ── RESULTS TABLE ─────────────────────── */
+    .results-section { overflow-x: auto; }
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+      margin: 1.2rem 0;
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .results-table thead {
+      background: #1e293b;
+      color: #e2e8f0;
+    }
+    .results-table thead th {
+      padding: 0.8rem 1rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+    }
+    .results-table thead th:first-child { text-align: left; }
+    .results-table .sub-header {
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-size: 0.73rem;
+      font-weight: 500;
+    }
+    .results-table tbody tr { border-bottom: 1px solid var(--border); }
+    .results-table tbody tr:hover { background: var(--surface2); }
+    .results-table td {
+      padding: 0.65rem 1rem;
+      text-align: center;
+      color: var(--text);
+    }
+    .results-table td:first-child { text-align: left; font-weight: 500; }
+    .results-table .divider td { border-top: 2px solid var(--border); }
+    .results-table .ours {
+      background: #f0fdf4;
+      font-weight: 700;
+    }
+    .results-table .ours td:first-child { color: var(--green); }
+    .best { font-weight: 700; color: var(--green); }
+    .tcpr-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+    }
+    .table-caption {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.6rem;
+      line-height: 1.6;
+    }
+    .table-caption strong { color: var(--text); }
+
+    /* ── METRIC CARDS ──────────────────────── */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.8rem;
+      margin: 1.5rem 0;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .metric-card .val {
+      font-family: 'Lora', serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1.1;
+    }
+    .metric-card .val-up { color: var(--green); }
+    .metric-card .val-down { color: #b91c1c; }
+    .metric-card .metric-name { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.3rem; }
+    .metric-card .metric-note { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    /* ── CONTRIBUTION LIST ─────────────────── */
+    .contrib-list {
+      list-style: none;
+      margin: 1rem 0;
+    }
+    .contrib-list li {
+      display: flex;
+      gap: 0.8rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.6rem;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+      align-items: flex-start;
+    }
+    .contrib-num {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 0.1rem;
+    }
+
+    /* ── BIB ───────────────────────────────── */
+    .bib-block {
+      position: relative;
+      background: #0f172a;
+      color: #94a3b8;
+      border-radius: var(--radius);
+      padding: 1.4rem 1.6rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.76rem;
+      line-height: 1.8;
+      overflow-x: auto;
+      box-shadow: var(--shadow);
+    }
+    .bib-block .key { color: #7dd3fc; }
+    .bib-block .val { color: #a5f3fc; }
+    .bib-block .field { color: #c4b5fd; }
+    .copy-btn {
+      position: absolute;
+      top: 0.7rem; right: 0.7rem;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #94a3b8;
+      border-radius: 6px;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+    /* ── FOOTER ────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 2.5rem 2rem 3rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── PAPER FIGURES ─────────────────────── */
+    .paper-figure {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem;
+      margin: 1.5rem 0;
+      box-shadow: var(--shadow);
+    }
+    .paper-figure img {
+      width: 100%;
+      border-radius: 6px;
+      display: block;
+    }
+    .fig-caption {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.8rem;
+      line-height: 1.6;
+      border-top: 1px solid var(--border);
+      padding-top: 0.7rem;
+    }
+    .fig-caption strong { color: var(--text); }
+    .fig-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    @media (max-width: 600px) { .fig-row { grid-template-columns: 1fr; } }
+
+    /* ── SCROLL ANIMATION ──────────────────── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-in.visible { opacity: 1; transform: none; }
+
+    /* ── RESPONSIVE ────────────────────────── */
+    @media (max-width: 640px) {
+      .topbar-nav { display: none; }
+      .teaser-pipeline { gap: 0; }
+      .pipe-arrow { padding: 0 0.2rem; font-size: 1rem; }
+      .pipe-block { min-width: 80px; padding: 0.6rem 0.5rem; }
+      .wt-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── TOPBAR ────────────────────────────────── -->
+<header class="topbar">
+  <span class="topbar-logo">LC-VAE</span>
+  <nav>
+    <ul class="topbar-nav">
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#method">Method</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#bibtex">BibTeX</a></li>
+    </ul>
+  </nav>
+</header>
+
+<!-- ── HERO ──────────────────────────────────── -->
+<div class="hero fade-in visible">
+  <div class="conference-badge">CVPR 2026</div>
+  <h1>Latent-Compressed Variational Autoencoder<br />for <em>Video Diffusion</em> Models</h1>
+  <p class="shortname">LC-VAE</p>
+
+  <div class="authors">
+    <span class="author-item">Jiarui Guan<sup>1</sup></span>
+    <span class="author-item">Wenshuai Zhao<sup>1,2</sup><span class="star"> ✉</span></span>
+    <span class="author-item">Zhengtao Zou<sup>1</sup></span>
+    <span class="author-item">Juho Kannala<sup>1,3</sup></span>
+    <span class="author-item">Arno Solin<sup>1,2</sup></span>
+  </div>
+  <p class="affiliations">
+    <sup>1</sup>Aalto University &nbsp;&nbsp;
+    <sup>2</sup>ELLIS Finland Institute &nbsp;&nbsp;
+    <sup>3</sup>University of Oulu
+  </p>
+  <p class="contact-email">{jiarui.guan, wenshuai.zhao, zhengtao.zou, juho.kannala, arno.solin}@aalto.fi</p>
+
+  <div class="link-row">
+    <a class="btn btn-primary" href="#" onclick="return false;">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM6 20V4h5v7h7v9H6z"/></svg>
+      Paper
+    </a>
+    <a class="btn btn-outline" href="#" onclick="return false;">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.49.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+      Code
+    </a>
+    <a class="btn btn-outline" href="#" onclick="return false;">
+      <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+      arXiv
+    </a>
+    <a class="btn btn-outline" href="#" onclick="return false;">
+      <svg viewBox="0 0 24 24"><path d="M14.5 2.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-9 7a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm9 9a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM5.5 13.5l8.25-4.75M5.5 13.5l8.25 4.75"/></svg>
+      Demo
+    </a>
+  </div>
+
+  <!-- TEASER: actual paper figure -->
+  <div class="teaser-box">
+    <img src="imgs/teaser-1.png" alt="LC-VAE teaser figure" style="width:100%;border-radius:8px;display:block;margin-bottom:1.2rem;" />
+    <p class="teaser-caption">
+      <strong>Figure 1.</strong> Comparison between video VAEs with and without the proposed latent compression. LC-VAE performs frequency-aware latent compression for video generation. An input video is encoded and decomposed by multi-level 3D wavelet transforms (Multi-WT); low-frequency channels are retained as compact latent representations where diffusion operates. After denoising, the latent is zero-padded, processed by multi-level inverse wavelet transforms (Multi-IWT), and decoded into the final video. This design preserves global structure while reducing latent dimensionality.
+    </p>
+  </div>
+</div>
+
+<!-- ── ABSTRACT ───────────────────────────────── -->
+<section id="abstract" class="fade-in">
+  <p class="section-label">Abstract</p>
+  <h2>Compressing Latent Space by Removing<br/>Uninformative High-Frequency Components</h2>
+  <div class="abstract-card">
+    Video variational autoencoders (VAEs) used in latent diffusion models typically require a sufficiently large number of latent channels to ensure high-quality video reconstruction. However, recent studies have revealed that an excessive number of latent channels can <strong>impede the convergence of latent diffusion models</strong> and deteriorate their generative performance, even when reconstruction quality remains high. We propose a latent compression method that removes high-frequency components in video latent representations rather than directly reducing the number of channels, which often compromises reconstruction fidelity. Experimental results demonstrate that the proposed method achieves <strong>superior video reconstruction quality</strong> compared to strong baselines while maintaining the same overall compression ratio.
+  </div>
+</section>
+
+<!-- ── MOTIVATION ─────────────────────────────── -->
+<section class="fade-in">
+  <p class="section-label">Motivation</p>
+  <h2>Why Existing Video VAEs Fall Short</h2>
+  <p>Designing a latent space for videos is uniquely challenging: maintaining a large number of latent channels is critical for high reconstruction quality, yet increasing channel dimensionality raises computational cost and complicates diffusion training. We identify a fundamental inefficiency:</p>
+  <div class="insight-grid">
+    <div class="insight-card">
+      <svg viewBox="0 0 120 56" style="width:100%;max-height:56px;margin-bottom:0.7rem">
+        <!-- PSNR vs channels bar chart -->
+        <rect x="0" y="0" width="120" height="56" rx="6" fill="#f8faff"/>
+        <text x="10" y="12" font-size="7" fill="#94a3b8" font-family="DM Mono,monospace">PSNR vs #Channels</text>
+        <!-- bars -->
+        <rect x="15" y="38" width="14" height="10" rx="2" fill="#3b82f6"/>
+        <rect x="33" y="30" width="14" height="18" rx="2" fill="#3b82f6"/>
+        <rect x="51" y="25" width="14" height="23" rx="2" fill="#3b82f6"/>
+        <rect x="69" y="22" width="14" height="26" rx="2" fill="#93c5fd"/>
+        <rect x="87" y="21" width="14" height="27" rx="2" fill="#bfdbfe"/>
+        <!-- labels -->
+        <text x="22" y="51" text-anchor="middle" font-size="6" fill="#64748b" font-family="DM Mono,monospace">4</text>
+        <text x="40" y="51" text-anchor="middle" font-size="6" fill="#64748b" font-family="DM Mono,monospace">8</text>
+        <text x="58" y="51" text-anchor="middle" font-size="6" fill="#64748b" font-family="DM Mono,monospace">16</text>
+        <text x="76" y="51" text-anchor="middle" font-size="6" fill="#64748b" font-family="DM Mono,monospace">32</text>
+        <text x="94" y="51" text-anchor="middle" font-size="6" fill="#64748b" font-family="DM Mono,monospace">64</text>
+        <!-- diminishing arrow -->
+        <path d="M15 38 Q50 22 104 20" fill="none" stroke="#f97316" stroke-width="1.2" stroke-dasharray="3,2"/>
+        <text x="105" y="19" font-size="7" fill="#f97316" font-family="DM Sans,sans-serif">↘</text>
+      </svg>
+      <h3>Diminishing Returns</h3>
+      <p>Increasing latent channels yields only marginal PSNR gains, revealing substantial redundancy in learned representations.</p>
+    </div>
+    <div class="insight-card">
+      <svg viewBox="0 0 120 56" style="width:100%;max-height:56px;margin-bottom:0.7rem">
+        <!-- Frequency spectrum: low vs high -->
+        <rect x="0" y="0" width="120" height="56" rx="6" fill="#fef9f0"/>
+        <text x="10" y="12" font-size="7" fill="#94a3b8" font-family="DM Mono,monospace">Latent Energy / Freq.</text>
+        <!-- freq axis -->
+        <line x1="10" y1="46" x2="110" y2="46" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="10" y="54" font-size="6" fill="#64748b" font-family="DM Mono,monospace">LF</text>
+        <text x="97" y="54" font-size="6" fill="#64748b" font-family="DM Mono,monospace">HF</text>
+        <!-- energy curve (too much HF) -->
+        <path d="M14 43 Q30 16 50 28 Q70 40 90 42 Q100 43 108 44" fill="#fde68a" fill-opacity="0.5" stroke="#f59e0b" stroke-width="1.5"/>
+        <!-- ideal curve (LF focus) -->
+        <path d="M14 22 Q30 38 60 43 Q80 45 108 46" fill="#dbeafe" fill-opacity="0.5" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <text x="58" y="20" font-size="6.5" fill="#f59e0b" font-family="DM Sans,sans-serif">excess HF</text>
+        <text x="60" y="38" font-size="6.5" fill="#3b82f6" font-family="DM Sans,sans-serif">ideal</text>
+      </svg>
+      <h3>High-Frequency Excess</h3>
+      <p>Existing autoencoders produce latents with disproportionately large high-frequency components that conflict with the coarse-to-fine nature of diffusion synthesis.</p>
+    </div>
+    <div class="insight-card">
+      <svg viewBox="0 0 120 56" style="width:100%;max-height:56px;margin-bottom:0.7rem">
+        <!-- Diffusion training loss curve comparison -->
+        <rect x="0" y="0" width="120" height="56" rx="6" fill="#fdf4ff"/>
+        <text x="10" y="12" font-size="7" fill="#94a3b8" font-family="DM Mono,monospace">Diffusion Train Loss</text>
+        <line x1="10" y1="46" x2="110" y2="46" stroke="#e2e8f0" stroke-width="1"/>
+        <line x1="10" y1="46" x2="10" y2="16" stroke="#e2e8f0" stroke-width="1"/>
+        <!-- baseline (slow convergence) -->
+        <path d="M12 20 Q30 22 50 28 Q70 34 90 38 Q100 40 108 42" fill="none" stroke="#f87171" stroke-width="1.5"/>
+        <!-- LC-VAE (fast) -->
+        <path d="M12 20 Q25 30 45 36 Q65 40 85 43 Q98 44 108 45" fill="none" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="85" y="39" font-size="6.5" fill="#dc2626" font-family="DM Sans,sans-serif">baseline</text>
+        <text x="82" y="52" font-size="6.5" fill="#16a34a" font-family="DM Sans,sans-serif">LC-VAE ✓</text>
+        <text x="65" y="18" font-size="6" fill="#94a3b8" font-family="DM Mono,monospace">steps →</text>
+      </svg>
+      <h3>Diffusion Interference</h3>
+      <p>High-frequency, unstructured latent channels hinder diffusion model training — which inherently favors smooth, low-frequency representations.</p>
+    </div>
+    <div class="insight-card">
+      <svg viewBox="0 0 120 56" style="width:100%;max-height:56px;margin-bottom:0.7rem">
+        <!-- Wavelet subband energy heatmap 2×4 -->
+        <rect x="0" y="0" width="120" height="56" rx="6" fill="#f0fdf4"/>
+        <text x="10" y="12" font-size="7" fill="#94a3b8" font-family="DM Mono,monospace">Subband Energy</text>
+        <!-- 8 subband cells -->
+        <rect x="10" y="16" width="22" height="16" rx="3" fill="#1d4ed8"/>
+        <text x="21" y="27" text-anchor="middle" font-size="6" fill="white" font-family="DM Mono,monospace">LLL</text>
+        <rect x="35" y="16" width="22" height="16" rx="3" fill="#3b82f6"/>
+        <text x="46" y="27" text-anchor="middle" font-size="6" fill="white" font-family="DM Mono,monospace">LLH</text>
+        <rect x="60" y="16" width="22" height="16" rx="3" fill="#60a5fa"/>
+        <text x="71" y="27" text-anchor="middle" font-size="6" fill="white" font-family="DM Mono,monospace">LHL</text>
+        <rect x="85" y="16" width="22" height="16" rx="3" fill="#93c5fd"/>
+        <text x="96" y="27" text-anchor="middle" font-size="6" fill="#1d4ed8" font-family="DM Mono,monospace">HLL</text>
+        <rect x="10" y="35" width="22" height="16" rx="3" fill="#fecaca"/>
+        <text x="21" y="46" text-anchor="middle" font-size="6" fill="#991b1b" font-family="DM Mono,monospace">LHH</text>
+        <rect x="35" y="35" width="22" height="16" rx="3" fill="#fca5a5"/>
+        <text x="46" y="46" text-anchor="middle" font-size="6" fill="#991b1b" font-family="DM Mono,monospace">HLH</text>
+        <rect x="60" y="35" width="22" height="16" rx="3" fill="#fed7aa"/>
+        <text x="71" y="46" text-anchor="middle" font-size="6" fill="#9a3412" font-family="DM Mono,monospace">HHL</text>
+        <rect x="85" y="35" width="22" height="16" rx="3" fill="#fef9c3"/>
+        <text x="96" y="46" text-anchor="middle" font-size="6" fill="#854d0e" font-family="DM Mono,monospace">HHH</text>
+        <!-- keep/zero labels -->
+        <text x="7" y="15" font-size="5.5" fill="#1d4ed8" font-family="DM Mono,monospace">keep</text>
+        <text x="7" y="34" font-size="5.5" fill="#dc2626" font-family="DM Mono,monospace">zero</text>
+      </svg>
+      <h3>Our Key Insight</h3>
+      <p>Low-frequency subbands carry higher energy and stronger temporal correlation — they encode structure; decoders can recover the rest.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── METHOD ─────────────────────────────────── -->
+<section id="method" class="fade-in">
+  <p class="section-label">Method</p>
+  <h2>LC-VAE: Frequency-Aware Latent Compression</h2>
+  <p>LC-VAE compresses the video latent by applying a multi-level 3D Haar wavelet transform and selectively zeroing out the high-frequency subbands. The encoder is forced to focus on diffusion-favorable, low-frequency content — high-frequency texture recovery is delegated to the decoder.</p>
+
+  <!-- Framework overview: actual paper figure -->
+  <div class="paper-figure fade-in">
+    <img src="imgs/figure_2-1.png" alt="LC-VAE framework overview" />
+    <p class="fig-caption"><strong>Figure 2.</strong> Overview of the LC-VAE framework. The model first applies a multi-level wavelet transform (Multi-WT) to the latent features produced by the encoder. Low-frequency channels are selected to retain compact yet informative representations, while the high-frequency subbands are zeroed out. During generation, diffusion operates within this compressed subspace. The sampled representation is subsequently zero-padded, passed through multi-scale inverse wavelet transforms (Multi-IWT), and decoded to reconstruct the video.</p>
+  </div>
+
+  <div class="method-diagram">
+    <h3>Wavelet Subband Selection — 3D Haar Decomposition</h3>
+    <!-- Actual paper figure: frequency analysis heatmap -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem;">
+      <div>
+        <img src="imgs/figure_3-1.png" alt="Frequency energy and correlation analysis" style="width:100%;border-radius:6px;" />
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;line-height:1.5;"><strong>Figure 3.</strong> Energy and correlation distribution across frequencies. Low-frequency subbands exhibit higher energy and stronger temporal correlation, whereas high-frequency subbands are less informative.</p>
+      </div>
+      <div>
+        <img src="imgs/multi_level_wt-1.png" alt="Multi-level wavelet transform structure" style="width:100%;border-radius:6px;" />
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;line-height:1.5;"><strong>Multi-level WT.</strong> Hierarchical 3D Haar wavelet decomposition producing 8 subbands per level — {LLL, LLH, LHL, HLL} are retained; {LHH, HLH, HHL, HHH} are zeroed out.</p>
+      </div>
+    </div>
+
+    <div class="eq-box">
+      <span class="field">Subband zeroing rule:</span><br/>
+      &nbsp;&nbsp;<span class="highlight">B̃<sub>abc</sub> = B<sub>abc</sub></span> &nbsp;&nbsp;if abc ∈ <span class="highlight">{LLL, LLH, LHL, HLL}</span> &nbsp;&nbsp;← retained<br/>
+      &nbsp;&nbsp;<span class="highlight">B̃<sub>abc</sub> = </span><span class="zero-out">0</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;otherwise &nbsp;&nbsp;← <span class="zero-out">zeroed out (HF)</span><br/><br/>
+      <span class="field">Decode:</span>&nbsp;&nbsp;z̃ = 𝒲<sup>-1</sup>({B̃<sub>abc</sub>}) &nbsp;→&nbsp; v̂ = 𝒟(z̃)
+    </div>
+  </div>
+
+    <div class="eq-box">
+      <span class="field">Subband zeroing rule:</span><br/>
+      &nbsp;&nbsp;<span class="highlight">B̃<sub>abc</sub> = B<sub>abc</sub></span> &nbsp;&nbsp;if abc ∈ <span class="highlight">{LLL, LLH, LHL, HLL}</span> &nbsp;&nbsp;← retained<br/>
+      &nbsp;&nbsp;<span class="highlight">B̃<sub>abc</sub> = </span><span class="zero-out">0</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;otherwise &nbsp;&nbsp;← <span class="zero-out">zeroed out (HF)</span><br/><br/>
+      <span class="field">Decode:</span>&nbsp;&nbsp;z̃ = 𝒲<sup>-1</sup>({B̃<sub>abc</sub>}) &nbsp;→&nbsp; v̂ = 𝒟(z̃)
+    </div>
+  </div>
+
+  <ul class="contrib-list">
+    <li>
+      <span class="contrib-num">1</span>
+      <span><strong>Latent-space wavelet analysis.</strong> We apply a 3D Haar wavelet transform to video latent representations and show that low-frequency subbands dominate energy and temporal autocorrelation, while high-frequency subbands are disordered and contribute little to reconstruction quality.</span>
+    </li>
+    <li>
+      <span class="contrib-num">2</span>
+      <span><strong>Frequency-aware latent compression.</strong> By zeroing out the four highest-frequency subbands (LHH, HLH, HHL, HHH) and retaining only {LLL, LLH, LHL, HLL}, LC-VAE achieves a compact, diffusion-friendly latent without reducing the number of channels — which would sacrifice reconstruction fidelity.</span>
+    </li>
+    <li>
+      <span class="contrib-num">3</span>
+      <span><strong>Architecture-agnostic design.</strong> Our compression and reconstruction procedure is a drop-in module compatible with existing video VAE architectures and training objectives (L1, LPIPS, adversarial, KL, wavelet-flow losses).</span>
+    </li>
+    <li>
+      <span class="contrib-num">4</span>
+      <span><strong>Downstream generation benefits.</strong> Diffusion models trained on LC-VAE's compact, low-frequency latents exhibit superior generation performance compared to those trained on baseline representations.</span>
+    </li>
+  </ul>
+</section>
+
+<!-- ── RESULTS ─────────────────────────────────── -->
+<section id="results" class="fade-in results-section">
+  <p class="section-label">Experiments</p>
+  <h2>State-of-the-Art Video Reconstruction</h2>
+  <p>We evaluate LC-VAE against six strong baseline video VAEs across multiple large-scale benchmarks. Experiments cover video reconstruction quality, zero-shot generalization, and diffusion-based generation capability.</p>
+
+  <!-- Training curves -->
+  <div class="paper-figure fade-in">
+    <img src="imgs/figure_5-1.png" alt="Validation PSNR training curves" />
+    <p class="fig-caption"><strong>Figure 5 — Validation PSNR during training.</strong> Across all channel sizes (Chn. = 4, 8, 16), LC-VAE consistently achieves higher validation PSNR than WF-VAE throughout training, demonstrating faster convergence and better reconstruction quality.</p>
+  </div>
+
+  <!-- TABLE 1: Main reconstruction results -->
+  <h3 style="font-family:'Lora',serif;font-size:1.1rem;font-weight:700;margin:2rem 0 0.5rem;">Table 1 — Main Reconstruction Performance</h3>
+  <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">Zero-shot test on WebVid-10M and Panda-70M. TCPR = token compression ratio; Chn. = latent channels. <strong>Bold</strong> = best.</p>
+  <div style="overflow-x:auto;">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Method</th>
+        <th rowspan="2">TCPR</th>
+        <th rowspan="2">Chn.</th>
+        <th colspan="4">WebVid-10M</th>
+        <th colspan="4">Panda-70M</th>
+      </tr>
+      <tr class="sub-header">
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th><th>rFVD ↓</th>
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th><th>rFVD ↓</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SD-VAE</td><td><span class="tcpr-tag">64×</span></td><td>4</td>
+        <td>30.19</td><td>0.838</td><td>0.057</td><td>284.9</td>
+        <td>30.46</td><td>0.890</td><td>0.040</td><td>183.0</td>
+      </tr>
+      <tr>
+        <td>SVD-VAE</td><td><span class="tcpr-tag">64×</span></td><td>4</td>
+        <td>31.18</td><td>0.869</td><td>0.055</td><td>188.7</td>
+        <td>31.04</td><td>0.906</td><td>0.038</td><td>137.7</td>
+      </tr>
+      <tr class="divider">
+        <td>CV-VAE</td><td><span class="tcpr-tag">256×</span></td><td>4</td>
+        <td>30.76</td><td>0.857</td><td>0.080</td><td>369.2</td>
+        <td>30.18</td><td>0.880</td><td>0.067</td><td>296.3</td>
+      </tr>
+      <tr>
+        <td>OD-VAE</td><td><span class="tcpr-tag">256×</span></td><td>4</td>
+        <td>30.69</td><td>0.864</td><td>0.055</td><td>255.9</td>
+        <td>30.31</td><td>0.894</td><td>0.044</td><td>191.2</td>
+      </tr>
+      <tr>
+        <td>Open-Sora VAE</td><td><span class="tcpr-tag">256×</span></td><td>4</td>
+        <td>31.52</td><td>0.876</td><td>0.056</td><td>208.5</td>
+        <td>31.21</td><td>0.910</td><td>0.040</td><td>155.6</td>
+      </tr>
+      <tr>
+        <td>WF-VAE</td><td><span class="tcpr-tag">256×</span></td><td>16</td>
+        <td>33.62</td><td>0.912</td><td>0.036</td><td>96.2</td>
+        <td>33.11</td><td>0.938</td><td>0.026</td><td>76.4</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td><span class="tcpr-tag">256×</span></td><td>16</td>
+        <td class="best">34.41</td><td class="best">0.921</td><td class="best">0.031</td><td class="best">74.8</td>
+        <td class="best">34.07</td><td class="best">0.944</td><td class="best">0.022</td><td class="best">58.3</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Qualitative comparison figure -->
+  <div class="paper-figure fade-in" style="margin-top:2rem;">
+    <img src="imgs/figure_4_case-1.png" alt="Qualitative reconstruction comparison" />
+    <p class="fig-caption"><strong>Figure 4 — Qualitative comparison of reconstruction performance.</strong> LC-VAE vs. WF-VAE under the same compression ratios (equivalent channels). LC-VAE reconstructs finer details with fewer artifacts across diverse scenes.</p>
+  </div>
+
+  <!-- TABLE 2: Zero-shot generalization -->
+  <h3 style="font-family:'Lora',serif;font-size:1.1rem;font-weight:700;margin:2.5rem 0 0.5rem;">Table 2 — Zero-Shot Generalization</h3>
+  <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">Reconstruction on three unseen datasets. LC-VAE maintains consistently high performance while WF-VAE suffers a 0.5–1.5 dB PSNR drop on out-of-domain data.</p>
+  <div style="overflow-x:auto;">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Method</th>
+        <th rowspan="2">Chn.</th>
+        <th colspan="4">UCF-101</th>
+        <th colspan="4">SkyTimelapse</th>
+        <th colspan="4">OpenVid-1M</th>
+      </tr>
+      <tr class="sub-header">
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th><th>rFVD ↓</th>
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th><th>rFVD ↓</th>
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th><th>rFVD ↓</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>WF-VAE</td><td>4</td>
+        <td>30.32</td><td>0.896</td><td>0.043</td><td class="best">337.7</td>
+        <td>36.59</td><td>0.944</td><td>0.020</td><td>100.7</td>
+        <td>32.98</td><td>0.883</td><td>0.042</td><td>193.1</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>4</td>
+        <td class="best">30.57</td><td class="best">0.901</td><td class="best">0.033</td><td>340.2</td>
+        <td class="best">36.87</td><td class="best">0.949</td><td class="best">0.015</td><td class="best">87.1</td>
+        <td class="best">33.48</td><td class="best">0.899</td><td class="best">0.024</td><td class="best">145.0</td>
+      </tr>
+      <tr class="divider">
+        <td>WF-VAE</td><td>8</td>
+        <td>31.86</td><td>0.920</td><td>0.029</td><td class="best">189.5</td>
+        <td>37.71</td><td>0.954</td><td>0.014</td><td>61.7</td>
+        <td>34.20</td><td>0.907</td><td>0.031</td><td>109.9</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>8</td>
+        <td class="best">32.69</td><td class="best">0.929</td><td class="best">0.023</td><td>198.9</td>
+        <td class="best">38.65</td><td class="best">0.962</td><td class="best">0.010</td><td class="best">50.4</td>
+        <td class="best">35.27</td><td class="best">0.925</td><td class="best">0.017</td><td class="best">89.4</td>
+      </tr>
+      <tr class="divider">
+        <td>WF-VAE</td><td>16</td>
+        <td>34.40</td><td>0.949</td><td>0.017</td><td class="best">81.3</td>
+        <td>39.85</td><td>0.968</td><td>0.008</td><td>28.1</td>
+        <td>36.28</td><td>0.933</td><td>0.017</td><td>51.0</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>16</td>
+        <td class="best">34.83</td><td class="best">0.951</td><td class="best">0.016</td><td>106.1</td>
+        <td class="best">40.30</td><td class="best">0.972</td><td class="best">0.008</td><td class="best">27.3</td>
+        <td class="best">37.06</td><td class="best">0.946</td><td class="best">0.012</td><td class="best">50.4</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- TABLE 3: Video generation FVD/IS -->
+  <h3 style="font-family:'Lora',serif;font-size:1.1rem;font-weight:700;margin:2.5rem 0 0.5rem;">Table 3 — Video Generation Quality (Latte Diffusion)</h3>
+  <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">FVD₁₆ and IS evaluated on SkyTimelapse (unconditional) and UCF-101 (class-conditional) using Latte-L trained for 200k steps.</p>
+  <div style="overflow-x:auto;">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Method</th>
+        <th rowspan="2">Chn.</th>
+        <th colspan="1">SkyTimelapse</th>
+        <th colspan="2">UCF-101</th>
+      </tr>
+      <tr class="sub-header">
+        <th>FVD₁₆ ↓</th>
+        <th>FVD₁₆ ↓</th><th>IS ↑</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>WF-VAE</td><td>4</td>
+        <td class="best">198.87</td>
+        <td>565.80</td><td>61.19</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>4</td>
+        <td>240.56</td>
+        <td class="best">509.76</td><td class="best">70.71</td>
+      </tr>
+      <tr class="divider">
+        <td>WF-VAE</td><td>8</td>
+        <td>213.23</td>
+        <td>687.60</td><td>60.57</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>8</td>
+        <td class="best">201.24</td>
+        <td class="best">654.96</td><td class="best">66.72</td>
+      </tr>
+      <tr class="divider">
+        <td>WF-VAE</td><td>16</td>
+        <td>195.94</td>
+        <td class="best">721.43</td><td>52.66</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>16</td>
+        <td class="best">187.68</td>
+        <td>735.04</td><td class="best">54.89</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Generated videos figure -->
+  <div class="paper-figure fade-in" style="margin-top:1.5rem;">
+    <img src="imgs/figure_6-1.png" alt="Generated videos using LC-VAE with Latte" />
+    <p class="fig-caption"><strong>Figure 6 — Generated videos using LC-VAE with Latte.</strong> SkyTimelapse (top) and UCF-101 (bottom) datasets. LC-VAE's compact low-frequency latent enables more coherent and higher-quality generation across diverse video categories.</p>
+  </div>
+
+  <!-- TABLE 4: Ablation — PTLC vs LC-VAE -->
+  <h3 style="font-family:'Lora',serif;font-size:1.1rem;font-weight:700;margin:2.5rem 0 0.5rem;">Table 4 — Ablation: Joint Training vs. Post-Training Compression</h3>
+  <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.8rem;">Comparing LC-VAE against post-training latent compression (PTLC) applied to a pre-trained WF-VAE. Results confirm that <strong>joint training with latent compression is essential</strong> — PTLC degrades reconstruction by up to 5 dB PSNR.</p>
+  <div style="overflow-x:auto;">
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Method</th>
+        <th rowspan="2">Chn.</th>
+        <th colspan="3">WebVid-10M</th>
+        <th colspan="3">Panda-70M</th>
+      </tr>
+      <tr class="sub-header">
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>
+        <th>PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>WF-VAE (PTLC)</td><td>8</td>
+        <td>29.24</td><td>0.839</td><td>0.068</td>
+        <td>27.51</td><td>0.853</td><td>0.078</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>8</td>
+        <td class="best">31.49</td><td class="best">0.921</td><td class="best">0.025</td>
+        <td class="best">31.89</td><td class="best">0.891</td><td class="best">0.030</td>
+      </tr>
+      <tr class="divider">
+        <td>WF-VAE (PTLC)</td><td>16</td>
+        <td>30.49</td><td>0.873</td><td>0.055</td>
+        <td>28.67</td><td>0.874</td><td>0.068</td>
+      </tr>
+      <tr class="ours">
+        <td>LC-VAE (Ours)</td><td>16</td>
+        <td class="best">33.78</td><td class="best">0.921</td><td class="best">0.021</td>
+        <td class="best">33.64</td><td class="best">0.945</td><td class="best">0.017</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Fig: motivation PSNR vs channels -->
+  <div class="fig-row fade-in" style="margin-top:2rem;">
+    <div class="paper-figure" style="margin:0;">
+      <img src="imgs/figure_2_motivation-1.png" alt="Motivation: PSNR vs channels" />
+      <p class="fig-caption"><strong>PSNR vs. channels.</strong> Validation PSNR curves of WF-VAE for 4, 8, 16, and 32 latent channels. Increasing channels yields only marginal gains — revealing substantial redundancy.</p>
+    </div>
+    <div class="paper-figure" style="margin:0;">
+      <img src="imgs/figure_3_b-1.png" alt="Frequency removal comparison" />
+      <p class="fig-caption"><strong>High-frequency removal experiment.</strong> Removing HF from raw video preserves quality; removing HF from WF-VAE latent causes severe degradation — showing latents are over-sensitive to HF.</p>
+    </div>
+  </div>
+</section>
+<!-- ── BIBTEX ──────────────────────────────────── -->
+<section id="bibtex" class="fade-in">
+  <p class="section-label">Citation</p>
+  <h2>BibTeX</h2>
+  <p>If you find LC-VAE useful in your research, please consider citing our paper:</p>
+  <div class="bib-block" id="bib-content">
+    <button class="copy-btn" onclick="copyBib()">Copy</button>
+<span class="field">@inproceedings</span>{<span class="key">guan2026lcvae</span>,<br/>
+&nbsp;&nbsp;<span class="field">title</span>     = {<span class="val">Latent-Compressed Variational Autoencoder for Video Diffusion Models</span>},<br/>
+&nbsp;&nbsp;<span class="field">author</span>    = {<span class="val">Guan, Jiarui and Zhao, Wenshuai and Zou, Zhengtao and Kannala, Juho and Solin, Arno</span>},<br/>
+&nbsp;&nbsp;<span class="field">booktitle</span> = {<span class="val">Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)</span>},<br/>
+&nbsp;&nbsp;<span class="field">year</span>      = {<span class="val">2026</span>},<br/>
+}
+  </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────── -->
+<footer>
+  <p>
+    <strong>LC-VAE</strong> &middot; CVPR 2026 &middot;
+    <a href="https://www.aalto.fi">Aalto University</a> &middot;
+    <a href="https://ellis.eu/units/helsinki">ELLIS Finland Institute</a>
+  </p>
+  <p style="margin-top: 0.4rem;">
+    This webpage template is inspired by <a href="https://nerfies.github.io">Nerfies</a>.
+  </p>
+</footer>
+
+<script>
+  // Scroll-in animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+  // Copy BibTeX
+  function copyBib() {
+    const txt = `@inproceedings{guan2026lcvae,
+  title     = {Latent-Compressed Variational Autoencoder for Video Diffusion Models},
+  author    = {Guan, Jiarui and Zhao, Wenshuai and Zou, Zhengtao and Kannala, Juho and Solin, Arno},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2026},
+}`;
+    navigator.clipboard.writeText(txt).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1800);
+    });
+  }
+</script>
+</body>
+</html>
